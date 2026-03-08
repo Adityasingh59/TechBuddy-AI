@@ -1,11 +1,16 @@
 import os
 import json
-import base64
 import re
 from openai import AsyncOpenAI
 from typing import Optional, List
 
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+_client = None
+
+def get_client() -> AsyncOpenAI:
+    global _client
+    if _client is None:
+        _client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    return _client
 
 SYSTEM_PROMPT = """You are TechBuddy, a patient and friendly AI assistant.
 You help elderly users and parents navigate smartphone apps.
@@ -82,7 +87,7 @@ async def analyze_screen(
         "text": f"User's question: {query}{history_text}\n\nCurrent step number should be: {step_number + 1}",
     })
 
-    response = await client.chat.completions.create(
+    response = await get_client().chat.completions.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
