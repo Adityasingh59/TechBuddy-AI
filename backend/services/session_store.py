@@ -13,16 +13,17 @@ class SessionStore:
     def __init__(self):
         self._sessions: Dict[str, dict] = {}
 
-    def create(self) -> dict:
+    def create(self, task: str = "") -> dict:
         session_id = str(uuid.uuid4())
         now = datetime.datetime.utcnow()
         session = {
             "session_id": session_id,
             "created_at": now.isoformat(),
             "expires_at": (now + datetime.timedelta(minutes=SESSION_TIMEOUT)).isoformat(),
-            "history": [],          # List of past steps
+            "history": [],
             "step_number": 0,
             "is_complete": False,
+            "task": task,          # ← what the user wants to accomplish
         }
         self._sessions[session_id] = session
         return session
@@ -31,7 +32,6 @@ class SessionStore:
         session = self._sessions.get(session_id)
         if not session:
             return None
-        # Auto-expire check
         expires = datetime.datetime.fromisoformat(session["expires_at"])
         if datetime.datetime.utcnow() > expires:
             del self._sessions[session_id]
@@ -42,7 +42,6 @@ class SessionStore:
         session = self.get(session_id)
         if session:
             session["history"].append(step)
-            # Keep rolling window of last 10 steps
             if len(session["history"]) > 10:
                 session["history"] = session["history"][-10:]
             session["step_number"] = step.get("step_number", session["step_number"])
@@ -51,6 +50,10 @@ class SessionStore:
     def get_history(self, session_id: str) -> List[dict]:
         session = self.get(session_id)
         return session["history"] if session else []
+
+    def get_task(self, session_id: str) -> str:
+        session = self.get(session_id)
+        return session.get("task", "") if session else ""
 
     def mark_complete(self, session_id: str):
         session = self.get(session_id)

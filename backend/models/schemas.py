@@ -25,10 +25,15 @@ class AnalyzeResponse(BaseModel):
 
 class TTSRequest(BaseModel):
     text: str
-    voice: str = "nova"  # OpenAI TTS voice
+    voice: str = "nova"
+
+
+class SessionCreateRequest(BaseModel):
+    task: str = Field("", description="What the user wants to accomplish")
 
 
 class SessionResponse(BaseModel):
     session_id: str
     created_at: str
     expires_at: str
+    task: str = ""

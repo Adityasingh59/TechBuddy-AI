@@ -11,12 +11,21 @@ API_KEY_SET = bool(os.getenv("OPENAI_API_KEY") and os.getenv("OPENAI_API_KEY") !
 
 @router.post("", response_model=AnalyzeResponse)
 async def analyze(req: AnalyzeRequest):
-    session = store.get(req.session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found or expired")
+    # Allow demo sessions (id starts with "demo-") to skip store lookup
+    if req.session_id.startswith("demo-"):
+        task = ""
+        step_number = 0
+        history = []
+    else:
+        session = store.get(req.session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found or expired")
+        task = store.get_task(req.session_id)
+        history = store.get_history(req.session_id)
+        step_number = session.get("step_number", 0)
 
-    history = store.get_history(req.session_id)
-    step_number = session.get("step_number", 0)
+    # Use task from query override if provided
+    effective_task = req.query if req.session_id.startswith("demo-") else task
 
     if API_KEY_SET:
         result = await analyze_screen(
@@ -24,13 +33,13 @@ async def analyze(req: AnalyzeRequest):
             screenshot=req.screenshot,
             history=history,
             step_number=step_number,
+            task=task,
         )
     else:
-        # Demo mode — no API key needed
-        result = await demo_response(req.query, step_number)
+        result = await demo_response(req.query, step_number, task=task)
 
-    # Persist this step to session history
-    store.add_step(req.session_id, result)
+    if not req.session_id.startswith("demo-"):
+        store.add_step(req.session_id, result)
 
     return AnalyzeResponse(
         spoken_instruction=result.get("spoken_instruction", ""),
