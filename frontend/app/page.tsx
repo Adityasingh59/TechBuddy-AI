@@ -1,73 +1,56 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
-const PRESET_TASKS = [
-  { emoji: "💸", label: "Send Money", task: "send money on Venmo or payment app" },
-  { emoji: "💬", label: "Send a Message", task: "send a WhatsApp message to someone" },
-  { emoji: "📞", label: "Make a Call", task: "call someone on my phone" },
-  { emoji: "📧", label: "Send an Email", task: "send an email" },
-  { emoji: "🗺️", label: "Get Directions", task: "get directions on Google Maps" },
-  { emoji: "🚗", label: "Book an Uber", task: "book an Uber ride" },
-  { emoji: "📸", label: "Take a Photo", task: "take a photo" },
-  { emoji: "▶️", label: "Watch YouTube", task: "watch a video on YouTube" },
-  { emoji: "📱", label: "Instagram Post", task: "post a photo on Instagram" },
-  { emoji: "📶", label: "Connect to WiFi", task: "connect to WiFi" },
-  { emoji: "⚙️", label: "Change Settings", task: "change a setting on my phone" },
+const EXAMPLE_TASKS = [
+  "Send money on Venmo",
+  "Book an Uber",
+  "Order food on DoorDash",
+  "Post a photo on Instagram",
+  "Set up WhatsApp",
+  "Connect to WiFi",
+  "Turn on accessibility mode",
+  "Find a contact and call them",
 ];
 
 export default function LandingPage() {
   const router = useRouter();
+  const [task, setTask] = useState("");
   const [loading, setLoading] = useState(false);
-  const [customTask, setCustomTask] = useState("");
-  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const effectiveTask = selectedPreset ?? customTask;
-
-  async function startSession(taskOverride?: string) {
-    const task = taskOverride ?? effectiveTask;
-    setLoading(true);
+  async function createSession(taskText: string): Promise<string> {
     try {
       const res = await fetch(`${API_URL}/session/new`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task }),
+        body: JSON.stringify({ task: taskText }),
       });
       const data = await res.json();
-      const taskParam = encodeURIComponent(task);
-      router.push(`/session?id=${data.session_id}&task=${taskParam}`);
+      return data.session_id;
     } catch {
-      const demoId = "demo-" + Math.random().toString(36).slice(2, 10);
-      router.push(`/session?id=${demoId}&task=${encodeURIComponent(task)}`);
-    } finally {
-      setLoading(false);
+      return "demo-" + Math.random().toString(36).slice(2, 10);
     }
   }
 
-  async function generateShareLink() {
-    const task = effectiveTask;
+  async function startSession() {
     setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/session/new`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task }),
-      });
-      const data = await res.json();
-      const taskParam = encodeURIComponent(task);
-      const url = `${window.location.origin}/session?id=${data.session_id}&task=${taskParam}`;
-      setShareLink(url);
-    } catch {
-      const demoId = "demo-" + Math.random().toString(36).slice(2, 10);
-      setShareLink(`${window.location.origin}/session?id=${demoId}&task=${encodeURIComponent(task)}`);
-    } finally {
-      setLoading(false);
-    }
+    const sessionId = await createSession(task);
+    const taskParam = encodeURIComponent(task);
+    router.push(`/session?id=${sessionId}&task=${taskParam}`);
+  }
+
+  async function generateShareLink() {
+    setLoading(true);
+    const sessionId = await createSession(task);
+    const taskParam = encodeURIComponent(task);
+    setShareLink(`${window.location.origin}/session?id=${sessionId}&task=${taskParam}`);
+    setLoading(false);
   }
 
   function copyLink() {
@@ -78,106 +61,93 @@ export default function LandingPage() {
     }
   }
 
+  function useExample(example: string) {
+    setTask(example);
+    inputRef.current?.focus();
+  }
+
   return (
     <main style={styles.main}>
       <div style={styles.orb1} />
       <div style={styles.orb2} />
 
       <div style={styles.container}>
+
         {/* Badge */}
-        <div style={styles.badge} className="animate-fade-in-up">
+        <div style={styles.badge}>
           <span style={styles.badgeDot} />
           AI-Powered Phone Helper
         </div>
 
         {/* Heading */}
-        <h1 style={styles.heading} className="animate-fade-in-up">
+        <h1 style={styles.heading}>
           Need help with<br />
-          <span style={styles.headingAccent}>your phone?</span>
+          <span style={styles.headingGradient}>your phone?</span>
         </h1>
 
-        <p style={styles.subtext} className="animate-fade-in-up">
-          Tell TechBuddy what you want to do. It watches your screen and guides you — one simple step at a time.
+        <p style={styles.subtext}>
+          Tell TechBuddy what you want to do. It watches your screen and guides you — one step at a time, for any task.
         </p>
 
-        {/* ── Task Selection ── */}
-        <div style={styles.taskCard} className="animate-fade-in-up">
-          <h2 style={styles.taskTitle}>What do you want to do?</h2>
+        {/* ── Task input ── */}
+        <div style={styles.card}>
+          <label style={styles.label} htmlFor="task-input">
+            What do you need help with?
+          </label>
+          <input
+            id="task-input"
+            ref={inputRef}
+            type="text"
+            autoFocus
+            placeholder="Describe anything… e.g. 'Set up Face ID' or 'Find my photos'"
+            value={task}
+            onChange={(e) => setTask(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !loading) startSession(); }}
+            style={styles.input}
+          />
 
-          {/* Preset grid */}
-          <div style={styles.presetGrid}>
-            {PRESET_TASKS.map((pt) => (
+          {/* Example tags */}
+          <div style={styles.examplesRow}>
+            {EXAMPLE_TASKS.map((ex) => (
               <button
-                key={pt.task}
-                onClick={() => {
-                  setSelectedPreset(pt.task);
-                  setCustomTask("");
-                }}
-                style={{
-                  ...styles.presetBtn,
-                  ...(selectedPreset === pt.task ? styles.presetBtnActive : {}),
-                }}
+                key={ex}
+                onClick={() => useExample(ex)}
+                style={styles.exampleTag}
               >
-                <span style={styles.presetEmoji}>{pt.emoji}</span>
-                <span style={styles.presetLabel}>{pt.label}</span>
+                {ex}
               </button>
             ))}
           </div>
-
-          {/* Custom task input */}
-          <div style={styles.orDivider}>
-            <span style={styles.orLine} />
-            <span style={styles.orText}>or describe your own task</span>
-            <span style={styles.orLine} />
-          </div>
-
-          <input
-            id="custom-task-input"
-            type="text"
-            placeholder="e.g. 'Order food on DoorDash' or 'Reset my password'"
-            value={customTask}
-            onChange={(e) => { setCustomTask(e.target.value); setSelectedPreset(null); }}
-            style={styles.taskInput}
-          />
-
-          {/* Current task display */}
-          {effectiveTask && (
-            <div style={styles.selectedTaskBadge}>
-              <span>🎯</span>
-              <span style={{ fontWeight: 600 }}>Task: </span>
-              <span>{effectiveTask}</span>
-            </div>
-          )}
         </div>
 
-        {/* CTA */}
+        {/* Start button */}
         <button
           id="start-session-btn"
-          onClick={() => startSession()}
+          onClick={startSession}
           disabled={loading}
           style={{ ...styles.btnPrimary, ...(loading ? styles.btnDisabled : {}) }}
           className={!loading ? "pulse-ring" : ""}
         >
           {loading ? (
-            <span style={styles.btnContent}>
+            <span style={styles.btnRow}>
               <svg style={{ width: 24, height: 24, animation: "spin 1s linear infinite" }} viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.3" />
                 <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
               </svg>
-              Starting...
+              Starting session...
             </span>
           ) : (
-            <span style={styles.btnContent}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.2" />
-                <path d="M8 5v14l11-7L8 5z" fill="currentColor" />
+            <span style={styles.btnRow}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="12" cy="12" r="10" opacity="0.18" />
+                <path d="M8 5v14l11-7L8 5z" />
               </svg>
-              {effectiveTask ? `Start: ${effectiveTask.slice(0, 28)}${effectiveTask.length > 28 ? "…" : ""}` : "Start Help Session"}
+              Start Help Session
             </span>
           )}
         </button>
 
-        {/* Share link */}
+        {/* Divider */}
         <div style={styles.divider}>
           <span style={styles.dividerLine} />
           <span style={styles.dividerText}>or send a link to your parent</span>
@@ -185,91 +155,95 @@ export default function LandingPage() {
         </div>
 
         {!shareLink ? (
-          <button id="generate-link-btn" onClick={generateShareLink} disabled={loading} style={styles.btnSecondary}>
+          <button
+            id="generate-link-btn"
+            onClick={generateShareLink}
+            disabled={loading}
+            style={styles.btnSecondary}
+          >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
               <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
             </svg>
-            Generate Help Link
+            Generate Share Link
           </button>
         ) : (
-          <div style={styles.shareLinkBox} className="animate-fade-in-up">
-            <p style={styles.shareLinkLabel}>Share this link — task is pre-loaded for them:</p>
-            <div style={styles.shareLinkRow}>
-              <span style={styles.shareLinkText}>{shareLink}</span>
-              <button id="copy-link-btn" onClick={copyLink} style={{ ...styles.copyBtn, ...(copied ? styles.copyBtnSuccess : {}) }}>
-                {copied ? "✓ Copied!" : "Copy"}
+          <div style={styles.shareBox}>
+            <p style={styles.shareLabel}>Share this link — task is pre-loaded:</p>
+            <div style={styles.shareRow}>
+              <span style={styles.shareUrl}>{shareLink}</span>
+              <button
+                id="copy-link-btn"
+                onClick={copyLink}
+                style={{ ...styles.copyBtn, ...(copied ? styles.copyBtnDone : {}) }}
+              >
+                {copied ? "✓ Copied" : "Copy"}
               </button>
             </div>
           </div>
         )}
 
         {/* How it works */}
-        <div style={styles.howItWorks} className="animate-fade-in-up">
+        <div style={styles.howCard}>
           <h2 style={styles.howTitle}>How it works</h2>
           <div style={styles.stepsRow}>
             {[
-              { num: "1", label: "Pick a task", desc: "Choose from presets or type your own" },
-              { num: "2", label: "Share screen", desc: "AI can see your phone" },
-              { num: "3", label: "Ask or tap mic", desc: "Speak or type" },
-              { num: "4", label: "Follow steps", desc: "AI guides you" },
+              { n: "1", title: "Describe your task", desc: "Type anything in plain English" },
+              { n: "2", title: "Share your screen", desc: "AI sees exactly what's on your phone" },
+              { n: "3", title: "AI analyzes the screen", desc: "Identifies every button & element" },
+              { n: "4", title: "Follow one step at a time", desc: "Clear, spoken guidance" },
             ].map((s) => (
-              <div key={s.num} style={styles.step}>
-                <div style={styles.stepNum}>{s.num}</div>
-                <div style={styles.stepLabel}>{s.label}</div>
+              <div key={s.n} style={styles.step}>
+                <div style={styles.stepNum}>{s.n}</div>
+                <div style={styles.stepTitle}>{s.title}</div>
                 <div style={styles.stepDesc}>{s.desc}</div>
               </div>
             ))}
           </div>
         </div>
 
-        <p style={styles.footer}>🔒 Private & secure · Sessions expire in 30 min · No data stored</p>
+        <p style={styles.footer}>🔒 Private &amp; secure · Sessions expire in 30 min · No data stored</p>
       </div>
+
+      <style>{`@keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }`}</style>
     </main>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
   main: { minHeight: "100vh", background: "var(--navy)", position: "relative", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 16px" },
-  orb1: { position: "absolute", top: "-200px", left: "-100px", width: "600px", height: "600px", background: "radial-gradient(circle, rgba(20,184,166,0.12) 0%, transparent 70%)", borderRadius: "50%", pointerEvents: "none" },
-  orb2: { position: "absolute", bottom: "-200px", right: "-100px", width: "500px", height: "500px", background: "radial-gradient(circle, rgba(245,158,11,0.08) 0%, transparent 70%)", borderRadius: "50%", pointerEvents: "none" },
-  container: { maxWidth: "620px", width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: "20px", position: "relative", zIndex: 1 },
+  orb1: { position: "fixed", top: "-200px", left: "-100px", width: "600px", height: "600px", background: "radial-gradient(circle, rgba(20,184,166,0.1) 0%, transparent 70%)", borderRadius: "50%", pointerEvents: "none" },
+  orb2: { position: "fixed", bottom: "-150px", right: "-80px", width: "450px", height: "450px", background: "radial-gradient(circle, rgba(245,158,11,0.07) 0%, transparent 70%)", borderRadius: "50%", pointerEvents: "none" },
+  container: { maxWidth: "580px", width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: "20px", position: "relative", zIndex: 1 },
   badge: { display: "flex", alignItems: "center", gap: "8px", padding: "8px 20px", background: "rgba(20,184,166,0.1)", border: "1px solid rgba(20,184,166,0.3)", borderRadius: "100px", color: "var(--teal-light)", fontSize: "14px", fontWeight: 600 },
   badgeDot: { width: "8px", height: "8px", background: "var(--teal)", borderRadius: "50%", animation: "pulse-ring 2s infinite" },
-  heading: { fontSize: "clamp(40px, 8vw, 60px)", fontWeight: 900, textAlign: "center", lineHeight: 1.1, letterSpacing: "-0.03em", color: "var(--text-primary)" },
-  headingAccent: { background: "linear-gradient(135deg, var(--teal) 0%, var(--teal-light) 50%, var(--amber) 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" },
-  subtext: { fontSize: "19px", color: "var(--text-secondary)", textAlign: "center", maxWidth: "480px", lineHeight: 1.6 },
-  taskCard: { width: "100%", padding: "24px", background: "var(--navy-card)", border: "1px solid var(--navy-border)", borderRadius: "var(--radius-lg)", display: "flex", flexDirection: "column", gap: "16px" },
-  taskTitle: { fontSize: "20px", fontWeight: 700, color: "var(--text-primary)", textAlign: "center" },
-  presetGrid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px" },
-  presetBtn: { display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "12px 8px", background: "var(--navy)", border: "1px solid var(--navy-border)", borderRadius: "12px", cursor: "pointer", transition: "all 0.2s", minHeight: "70px", justifyContent: "center" },
-  presetBtnActive: { background: "rgba(20,184,166,0.15)", border: "2px solid var(--teal)", boxShadow: "0 0 12px var(--teal-glow)" },
-  presetEmoji: { fontSize: "24px" },
-  presetLabel: { fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)", textAlign: "center", lineHeight: 1.2 },
-  orDivider: { display: "flex", alignItems: "center", gap: "10px" },
-  orLine: { flex: 1, height: "1px", background: "var(--navy-border)" },
-  orText: { fontSize: "13px", color: "var(--text-muted)", whiteSpace: "nowrap" },
-  taskInput: { width: "100%", height: "52px", background: "var(--navy)", border: "1px solid var(--navy-border)", borderRadius: "12px", color: "var(--text-primary)", fontSize: "17px", padding: "0 16px", outline: "none" },
-  selectedTaskBadge: { display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", background: "rgba(20,184,166,0.1)", border: "1px solid rgba(20,184,166,0.3)", borderRadius: "10px", color: "var(--teal-light)", fontSize: "15px" },
-  btnPrimary: { width: "100%", minHeight: "72px", padding: "0 32px", background: "linear-gradient(135deg, var(--teal) 0%, #0d9488 100%)", color: "#fff", border: "none", borderRadius: "var(--radius)", fontSize: "20px", fontWeight: 700, cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", boxShadow: "0 4px 24px var(--teal-glow)", letterSpacing: "-0.01em" },
-  btnDisabled: { opacity: 0.7, cursor: "not-allowed" },
-  btnContent: { display: "flex", alignItems: "center", justifyContent: "center", gap: "12px" },
+  heading: { fontSize: "clamp(38px, 8vw, 58px)", fontWeight: 900, textAlign: "center", lineHeight: 1.1, letterSpacing: "-0.03em", color: "var(--text-primary)", margin: 0 },
+  headingGradient: { background: "linear-gradient(135deg, var(--teal) 0%, var(--teal-light) 50%, var(--amber) 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" },
+  subtext: { fontSize: "18px", color: "var(--text-secondary)", textAlign: "center", lineHeight: 1.6, maxWidth: "460px", margin: 0 },
+  card: { width: "100%", padding: "22px", background: "var(--navy-card)", border: "1px solid var(--navy-border)", borderRadius: "var(--radius-lg)", display: "flex", flexDirection: "column", gap: "14px" },
+  label: { fontSize: "17px", fontWeight: 700, color: "var(--text-primary)" },
+  input: { width: "100%", height: "58px", background: "var(--navy)", border: "2px solid var(--navy-border)", borderRadius: "14px", color: "var(--text-primary)", fontSize: "18px", padding: "0 18px", outline: "none", transition: "border-color 0.2s", boxSizing: "border-box" },
+  examplesRow: { display: "flex", flexWrap: "wrap", gap: "8px" },
+  exampleTag: { padding: "7px 14px", background: "var(--navy)", border: "1px solid var(--navy-border)", borderRadius: "100px", color: "var(--text-secondary)", fontSize: "13px", cursor: "pointer", transition: "all 0.15s" },
+  btnPrimary: { width: "100%", minHeight: "68px", background: "linear-gradient(135deg, var(--teal) 0%, #0d9488 100%)", color: "#fff", border: "none", borderRadius: "var(--radius)", fontSize: "20px", fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 24px var(--teal-glow)", letterSpacing: "-0.01em" },
+  btnDisabled: { opacity: 0.65, cursor: "not-allowed" },
+  btnRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: "12px" },
   divider: { display: "flex", alignItems: "center", gap: "12px", width: "100%" },
   dividerLine: { flex: 1, height: "1px", background: "var(--navy-border)" },
-  dividerText: { color: "var(--text-muted)", fontSize: "14px", whiteSpace: "nowrap" },
-  btnSecondary: { width: "100%", minHeight: "64px", padding: "0 32px", background: "transparent", color: "var(--teal-light)", border: "2px solid rgba(20,184,166,0.4)", borderRadius: "var(--radius)", fontSize: "18px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" },
-  shareLinkBox: { width: "100%", padding: "20px", background: "var(--navy-card)", border: "1px solid var(--navy-border)", borderRadius: "var(--radius)" },
-  shareLinkLabel: { fontSize: "15px", color: "var(--text-secondary)", marginBottom: "12px" },
-  shareLinkRow: { display: "flex", gap: "10px", alignItems: "center" },
-  shareLinkText: { flex: 1, fontSize: "13px", color: "var(--teal-light)", wordBreak: "break-all", fontFamily: "monospace" },
-  copyBtn: { minHeight: "40px", padding: "0 20px", background: "var(--navy-border)", color: "var(--text-primary)", border: "none", borderRadius: "8px", cursor: "pointer", fontSize: "15px", fontWeight: 600, whiteSpace: "nowrap" },
-  copyBtnSuccess: { background: "var(--green)", color: "#fff" },
-  howItWorks: { width: "100%", padding: "24px", background: "var(--navy-card)", border: "1px solid var(--navy-border)", borderRadius: "var(--radius-lg)" },
-  howTitle: { fontSize: "18px", fontWeight: 700, marginBottom: "18px", textAlign: "center", color: "var(--text-primary)" },
+  dividerText: { color: "var(--text-muted)", fontSize: "13px", whiteSpace: "nowrap" },
+  btnSecondary: { width: "100%", minHeight: "58px", background: "transparent", color: "var(--teal-light)", border: "2px solid rgba(20,184,166,0.35)", borderRadius: "var(--radius)", fontSize: "17px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" },
+  shareBox: { width: "100%", padding: "18px", background: "var(--navy-card)", border: "1px solid var(--navy-border)", borderRadius: "var(--radius)" },
+  shareLabel: { fontSize: "14px", color: "var(--text-secondary)", marginBottom: "10px" },
+  shareRow: { display: "flex", gap: "10px", alignItems: "center" },
+  shareUrl: { flex: 1, fontSize: "12px", color: "var(--teal-light)", wordBreak: "break-all", fontFamily: "monospace" },
+  copyBtn: { padding: "8px 18px", background: "var(--navy-border)", color: "var(--text-primary)", border: "none", borderRadius: "8px", cursor: "pointer", fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap" },
+  copyBtnDone: { background: "var(--green)", color: "#fff" },
+  howCard: { width: "100%", padding: "22px", background: "var(--navy-card)", border: "1px solid var(--navy-border)", borderRadius: "var(--radius-lg)" },
+  howTitle: { fontSize: "17px", fontWeight: 700, textAlign: "center", color: "var(--text-primary)", marginBottom: "16px" },
   stepsRow: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px" },
-  step: { display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", textAlign: "center" },
-  stepNum: { width: "36px", height: "36px", background: "linear-gradient(135deg, var(--teal), #0d9488)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "16px", color: "#fff" },
-  stepLabel: { fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" },
-  stepDesc: { fontSize: "12px", color: "var(--text-muted)" },
-  footer: { fontSize: "14px", color: "var(--text-muted)", textAlign: "center" },
+  step: { display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "6px" },
+  stepNum: { width: "34px", height: "34px", background: "linear-gradient(135deg, var(--teal), #0d9488)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "15px", color: "#fff" },
+  stepTitle: { fontSize: "12px", fontWeight: 700, color: "var(--text-primary)" },
+  stepDesc: { fontSize: "11px", color: "var(--text-muted)" },
+  footer: { fontSize: "13px", color: "var(--text-muted)", textAlign: "center" },
 };

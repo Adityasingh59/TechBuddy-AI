@@ -3,8 +3,8 @@
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "";
 
 interface HighlightElement {
     label: string;
